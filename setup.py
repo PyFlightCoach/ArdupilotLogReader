@@ -12,11 +12,11 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 from setuptools import setup
 
 setup(
-   name='ArdupilotLogReader',
+   name='ardupilot_log_reader',
    version='0.0.1',
    description='module to read ardupilot binary logs to memory',
    author='Thomas David',
    author_email='thomasdavid0@gmail.com',
-   packages=['ArdupilotLogReader'],  #same as name
+   packages=['ardupilot_log_reader'],  #same as name
    install_requires=['numpy', 'pandas', 'pymavlink'], 
 )

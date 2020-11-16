@@ -1,5 +1,5 @@
 package:
-  name: ArdupilotLogReader
+  name: ardupilot_log_reader
   version: '0.0.1'
 
 build:
@@ -29,4 +29,4 @@ requirements:
     - pymavlink
   test:
   imports:
-    - ArdupilotLogReader
+    - ardupilot_log_reader
