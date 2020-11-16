@@ -1,0 +1,32 @@
+package:
+  name: ArdupilotLogReader
+  version: '0.0.1'
+
+build:
+  number: 0
+
+source:
+  path: ./
+
+requirements:
+  build:
+    - python
+    - setuptools
+  host:
+    - future
+    - lxml
+    - pip
+    - numpy
+    - pandas
+    - pymavlink
+    - python
+  run:
+    - future
+    - lxml
+    - python
+    - numpy
+    - pandas
+    - pymavlink
+  test:
+  imports:
+    - ArdupilotLogReader
