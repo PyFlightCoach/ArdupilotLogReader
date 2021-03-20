@@ -190,16 +190,16 @@ class Ardupilot(object):
         """Merge logs on flighttime, 
         This will give 0 where data isn't available, so isn't necessarily very clever. 
         """
-        joined_log = self.dfs[titles[0]]
-        for title in titles[1:]:
+        available_titles = [title for title in titles if title in self.dfs.keys()]
+        joined_log = self.dfs[available_titles[0]]
+        for title in available_titles[1:]:
             if title=='PARM':
                 continue
-            if title in self.dfs.keys():
-                joined_log = pd.merge_asof(
-                    joined_log, 
-                    self.dfs[title], 
-                    on='timestamp'
-                )
+            joined_log = pd.merge_asof(
+                joined_log, 
+                self.dfs[title], 
+                on='timestamp'
+            )
         return joined_log
 
     def full_df(self):
