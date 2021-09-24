@@ -1,3 +1,8 @@
 {
-    "python.pythonPath": "/home/tomd/anaconda3/envs/ardupilotlogs/bin/python"
+    "python.pythonPath": "/home/tomd/anaconda3/envs/ardupilotlogs/bin/python",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
