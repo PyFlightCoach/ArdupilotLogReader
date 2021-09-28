@@ -31,3 +31,7 @@ def test_full_df_frequency(log, type_request):
     fulldf = log.join_logs(type_request)
     assert len(log.dfs['XKF1']) == len(fulldf)
 
+
+def test_time_epioch(log, type_request):
+    gpsdf = log.dfs['GPS']
+    assert "GPS_Time" in gpsdf.columns
