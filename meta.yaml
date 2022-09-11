@@ -1,10 +1,11 @@
 package:
   name: ardupilot_log_reader
-  version: '0.0.1'
+  version: '0.1.0'
 
 build:
+  noarch: generic
   number: 0
-
+  
 source:
   path: ./
 
@@ -15,7 +16,6 @@ requirements:
   host:
     - future
     - lxml
-    - pip
     - numpy
     - pandas
     - pymavlink
