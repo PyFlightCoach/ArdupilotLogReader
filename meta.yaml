@@ -15,15 +15,11 @@ requirements:
     - setuptools
   host:
     - future
-    - lxml
     - numpy
     - pandas
     - pymavlink
-    - python
   run:
     - future
-    - lxml
-    - python
     - numpy
     - pandas
     - pymavlink
