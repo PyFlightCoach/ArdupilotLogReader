@@ -151,15 +151,33 @@ class Ardupilot(object):
         
         mlog.filehandle.close()
 
+        self._dfs = {}
         self.dfs = {}
         for k, v in dfs_dicts.items():
-            self.dfs[k] = pd.DataFrame(
+            self._dfs[k] = pd.DataFrame(
                 data=v,
                 columns=[val if val == "timestamp" else k + val for val in v.keys()]
             )
-
+            #for back compatibility
+            if not Ardupilot._get_core(k):
+                self.dfs[k.split("_")[0]] = self._dfs[k]
+        
         self.parms = self.dfs['PARM'].set_index('PARMName')['PARMValue'].to_dict()
 
+    @staticmethod
+    def _get_core(k):
+        try:
+            spl = k.split("_")
+            assert len(spl) == 2
+            return int(spl[1])
+        except Exception as e:
+            return None
+
+    def __getattr__(self, name):
+        if name in self.dfs:
+            return self.dfs[name]
+        elif name in self._dfs:
+            return self._dfs[name]
 
     def join_logs(self, titles):
         """Merge logs on timestamp 
@@ -182,6 +200,7 @@ class Ardupilot(object):
         return joined_log
 
     def full_df(self):
-        dfs = list(self.dfs.keys())
-        dfs.pop("PARM")
-        return self.join_logs(dfs)
+        dfnames = list(self.dfs.keys())
+        dfnames.pop("PARM")
+        dfnames = [dfn for dfn in dfnames if Ardupilot._get_core(dfn) is None]
+        return self.join_logs(dfnames)

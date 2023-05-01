@@ -10,6 +10,8 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
 from ardupilot_log_reader.reader import Ardupilot
+import numpy as np
+import pandas as pd
 
 import pytest
 
@@ -42,6 +44,14 @@ def test_time_epioch(log):
 
 
 def test_time_index(log2):
-    assert "XKF1_0" in log2.dfs
-    assert log2.dfs["XKF1_0"].timestamp.is_monotonic_increasing
+    assert "XKF1_0" in log2._dfs
+    assert log2._dfs["XKF1_0"].timestamp.is_monotonic_increasing
+    assert pd.testing.assert_frame_equal(log2.dfs["XKF1"], log2._dfs["XKF1_0"])
 
+def test_get_core():
+    assert Ardupilot._get_core("XKF1") is None
+    assert Ardupilot._get_core("XKF1_0") == 0
+    assert Ardupilot._get_core("XKF1_1") == 1
+    assert not Ardupilot._get_core("XKF1")
+    assert not Ardupilot._get_core("XKF1_0")
+    assert Ardupilot._get_core("XKF1_1")
