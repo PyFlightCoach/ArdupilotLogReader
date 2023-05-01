@@ -127,10 +127,8 @@ class Ardupilot(object):
                 continue
             if link is not None and link != m._link:
                 continue
-
             if types is not None and m.get_type() != 'BAD_DATA' and not match_type(m.get_type(), types):
                 continue
-
             if nottypes is not None and match_type(m.get_type(), nottypes):
                 continue
 
@@ -138,43 +136,30 @@ class Ardupilot(object):
             # latter case is normally because of a mismatched MAVLink version.
             if m.get_type() == 'BAD_DATA':
                 continue
-
-            try:
-                dfs_dicts[m.get_type()]
-            except KeyError:
-                dfs_dicts[m.get_type()] = {}
-                dfs_dicts[m.get_type()]['timestamp'] = []
-                for field in m.get_fieldnames():
-                    dfs_dicts[m.get_type()][field] = []
             
-            dfs_dicts[m.get_type()]['timestamp'].append( getattr(m,'_timestamp', 0.0) )
+            key = f"{m.get_type()} _ {str(m.C)}" if hasattr(m, "C") else m.get_type()
+
+            if not key in dfs_dicts:
+                dfs_dicts[key] = {}
+                dfs_dicts[key]['timestamp'] = []
+                for field in m.get_fieldnames():
+                    dfs_dicts[key][field] = []
+            
+            dfs_dicts[key]['timestamp'].append( getattr(m,'_timestamp', 0.0) )
             for field in m.get_fieldnames():
-                dfs_dicts[m.get_type()][field].append( getattr(m,field) )
-
-        self._dfs = {}
-        for msgType in dfs_dicts.keys():
-            self._dfs[msgType] = pd.DataFrame(data=dfs_dicts[msgType])
-
-            new_cols = []
-            for val in self._dfs[msgType].columns:
-                if val == 'timestamp':
-                    new_cols.append(val)
-                else:
-                    new_cols.append(msgType + val)
-
-            self._dfs[msgType].columns = new_cols
-
+                dfs_dicts[key][field].append( getattr(m,field) )
+        
         mlog.filehandle.close()
 
-    @property
-    def dfs(self):
-        return self._dfs
-    
-    @property
-    def parms(self):
-        if not self._parms:
-            self._parms = self.dfs['PARM'].set_index('PARMName')['PARMValue'].to_dict()
-        return self._parms
+        self.dfs = {}
+        for k, v in dfs_dicts.items():
+            self.dfs[k] = pd.DataFrame(
+                data=v,
+                columns=[val if val == "timestamp" else k + val for val in v.keys()]
+            )
+
+        self.parms = self.dfs['PARM'].set_index('PARMName')['PARMValue'].to_dict()
+
 
     def join_logs(self, titles):
         """Merge logs on timestamp 
@@ -197,4 +182,6 @@ class Ardupilot(object):
         return joined_log
 
     def full_df(self):
-        return self.join_logs(list(self.dfs.keys())) # TODO remove PARA from here.
+        dfs = list(self.dfs.keys())
+        dfs.pop("PARM")
+        return self.join_logs(dfs)

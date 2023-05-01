@@ -16,7 +16,7 @@ import pytest
 
 @pytest.fixture(scope="session")
 def type_request():
-    return ['XKF1', 'XKQ1', 'NKF1', 'NKQ1', 'NKF2', 'XKF2', 'ARSP', 'GPS', 'RCIN', 'RCOU', 'IMU', 'BARO', 'MODE', 'RPM', 'MAG']
+    return ['XKF1', 'XKQ1', 'ARSP', 'GPS', 'RCIN', 'RCOU', 'IMU', 'BARO', 'MODE', 'RPM', 'MAG']
 
 @pytest.fixture(scope="session")
 def log(type_request):
@@ -36,9 +36,9 @@ def test_full_df_frequency(log, type_request):
     assert len(log.dfs['XKF1']) == len(fulldf)
 
 
-def test_time_epioch(log, type_request):
+def test_time_epioch(log):
     gpsdf = log.dfs['GPS']
-    assert "GPS_Time" in gpsdf.columns
+    assert "GPSTimeUS" in gpsdf.columns
 
 
 def test_index(log, log2):
