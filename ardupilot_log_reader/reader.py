@@ -137,7 +137,7 @@ class Ardupilot(object):
             if m.get_type() == 'BAD_DATA':
                 continue
             
-            key = f"{m.get_type()} _ {str(m.C)}" if hasattr(m, "C") else m.get_type()
+            key = f"{m.get_type()}_{str(m.C)}" if hasattr(m, "C") else m.get_type()
 
             if not key in dfs_dicts:
                 dfs_dicts[key] = {}

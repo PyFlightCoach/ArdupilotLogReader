@@ -41,5 +41,7 @@ def test_time_epioch(log):
     assert "GPSTimeUS" in gpsdf.columns
 
 
-def test_index(log, log2):
-    pass
+def test_time_index(log2):
+    assert "XKF1_0" in log2.dfs
+    assert log2.dfs["XKF1_0"].timestamp.is_monotonic_increasing
+
