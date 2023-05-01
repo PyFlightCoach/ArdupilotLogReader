@@ -22,6 +22,10 @@ def type_request():
 def log(type_request):
     return Ardupilot('tests/test_inputs/test_log_00000052.BIN', types=type_request, zero_time_base=True)
 
+@pytest.fixture(scope="session")
+def log2(type_request):
+    return Ardupilot('tests/test_inputs/00000129.BIN', types=type_request, zero_time_base=True)
+
 
 def test_dfs(type_request, log):
     assert set(log.dfs.keys()) == set(type_request + ['PARM'])
@@ -35,3 +39,7 @@ def test_full_df_frequency(log, type_request):
 def test_time_epioch(log, type_request):
     gpsdf = log.dfs['GPS']
     assert "GPS_Time" in gpsdf.columns
+
+
+def test_index(log, log2):
+    pass

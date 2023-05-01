@@ -86,13 +86,6 @@ class Ardupilot(object):
                                   dialect=dialect,
                                   zero_time_base=zero_time_base)
 
-        ext = os.path.splitext(filename)[1]
-        isbin = ext in ['.bin', '.BIN', '.px4log']
-        islog = ext in ['.log', '.LOG'] # NOTE: "islog" does not mean a tlog
-        istlog = ext in ['.tlog', '.TLOG']
-
-        # Track types found
-        available_types = set()
 
         types = list(set(types + ['PARM']))
 
@@ -145,9 +138,6 @@ class Ardupilot(object):
             # latter case is normally because of a mismatched MAVLink version.
             if m.get_type() == 'BAD_DATA':
                 continue
-
-            # Grab the timestamp.
-            timestamp = getattr(m, '_timestamp', 0.0)
 
             try:
                 dfs_dicts[m.get_type()]
