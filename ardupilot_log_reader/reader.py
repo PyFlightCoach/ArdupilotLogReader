@@ -154,15 +154,14 @@ class Ardupilot(object):
         self._dfs = {}
         self.dfs = {}
         for k, v in dfs_dicts.items():
-            self._dfs[k] = pd.DataFrame(
-                data=v,
-                columns=[val if val == "timestamp" else k + val for val in v.keys()]
-            )
+            self._dfs[k] = pd.DataFrame(v)
+            self._dfs[k].columns =[val if val == "timestamp" else k + val for val in v.keys()]
             #for back compatibility
             if not Ardupilot._get_core(k):
                 self.dfs[k.split("_")[0]] = self._dfs[k]
         
         self.parms = self.dfs['PARM'].set_index('PARMName')['PARMValue'].to_dict()
+
 
     @staticmethod
     def _get_core(k):
