@@ -155,9 +155,10 @@ class Ardupilot(object):
         self.dfs = {}
         for k, v in dfs_dicts.items():
             self._dfs[k] = pd.DataFrame(v)
-            self._dfs[k].columns =[val if val == "timestamp" else k + val for val in v.keys()]
+            core, name = Ardupilot._get_core(k)
+            self._dfs[k].columns =[val if val == "timestamp" else name + val for val in v.keys()]
             #for back compatibility
-            if not Ardupilot._get_core(k):
+            if not core:
                 self.dfs[k.split("_")[0]] = self._dfs[k]
         
         self.parms = self.dfs['PARM'].set_index('PARMName')['PARMValue'].to_dict()
@@ -165,12 +166,13 @@ class Ardupilot(object):
 
     @staticmethod
     def _get_core(k):
+        """returns the core if it exists, otherwise None"""
         try:
             spl = k.split("_")
             assert len(spl) == 2
-            return int(spl[1])
+            return int(spl[1]), spl[0]
         except Exception as e:
-            return None
+            return None, k
 
     def __getattr__(self, name):
         if name in self.dfs:
@@ -200,6 +202,6 @@ class Ardupilot(object):
 
     def full_df(self):
         dfnames = list(self.dfs.keys())
-        dfnames.pop("PARM")
+        dfnames.remove("PARM")
         dfnames = [dfn for dfn in dfnames if Ardupilot._get_core(dfn) is None]
         return self.join_logs(dfnames)
