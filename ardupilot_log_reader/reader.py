@@ -188,16 +188,12 @@ class Ardupilot(object):
         for title in available_titles[1:]:
             if title=='PARM':
                 continue
-            ln= len(self.dfs[title])
-            l0 = len(joined_log)
             joined_log = pd.merge_asof(
                 joined_log, 
                 self.dfs[title], 
                 on='timestamp'
             )
-            l1 = len(joined_log)
-            if l1 < l0:
-                pass
+
         return joined_log
 
     def full_df(self):
