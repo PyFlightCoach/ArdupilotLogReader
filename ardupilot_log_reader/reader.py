@@ -136,8 +136,8 @@ class Ardupilot(object):
             # latter case is normally because of a mismatched MAVLink version.
             if m.get_type() == 'BAD_DATA':
                 continue
-            
-            key = f"{m.get_type()}_{str(m.C)}" if hasattr(m, "C") else m.get_type()
+
+            key=m.get_type()
 
             if not key in dfs_dicts:
                 dfs_dicts[key] = {}
@@ -146,46 +146,28 @@ class Ardupilot(object):
                     dfs_dicts[key][field] = []
             
             dfs_dicts[key]['timestamp'].append( getattr(m,'_timestamp', 0.0) )
+            
             for field in m.get_fieldnames():
                 dfs_dicts[key][field].append( getattr(m,field) )
         
         mlog.filehandle.close()
 
-        self._dfs = {}
         self.dfs = {}
         for k, v in dfs_dicts.items():
-            self._dfs[k] = pd.DataFrame(v)
-            core, name = Ardupilot._get_core(k)
-            self._dfs[k].columns =[val if val == "timestamp" else name + val for val in v.keys()]
-            #for back compatibility
-            if not core:
-                self.dfs[k.split("_")[0]] = self._dfs[k]
-        
+            self.dfs[k] = pd.DataFrame(v)
+            self.dfs[k].columns = [val if val == "timestamp" else k + val for val in v.keys()]        
         self.parms = self.dfs['PARM'].set_index('PARMName')['PARMValue'].to_dict()
-
-
-    @staticmethod
-    def _get_core(k):
-        """returns the core if it exists, otherwise None"""
-        try:
-            spl = k.split("_")
-            assert len(spl) == 2
-            return int(spl[1]), spl[0]
-        except Exception as e:
-            return None, k
 
     def __getattr__(self, name):
         if name in self.dfs:
             return self.dfs[name]
-        elif name in self._dfs:
-            return self._dfs[name]
-
+        raise AttributeError(f"No such attribute: {name}")
+    
     def join_logs(self, titles):
         """Merge logs on timestamp 
         """
-        available_titles = [title for title in titles if title in self.dfs.keys()]
-        joined_log = self.dfs[available_titles[0]]
-        for title in available_titles[1:]:
+        joined_log = self.dfs[titles[0]]
+        for title in titles[1:]:
             if title=='PARM':
                 continue
             joined_log = pd.merge_asof(
@@ -196,8 +178,12 @@ class Ardupilot(object):
 
         return joined_log
 
+    @staticmethod
+    def join_dfs(dfs: list[pd.DataFrame]):
+        joined_log = dfs[0]
+        for df in dfs[1:]:
+            joined_log = pd.merge_asof(joined_log, df, on='timestamp')
+        return joined_log
+
     def full_df(self):
-        dfnames = list(self.dfs.keys())
-        dfnames.remove("PARM")
-        dfnames = [dfn for dfn in dfnames if Ardupilot._get_core(dfn) is None]
-        return self.join_logs(dfnames)
+        return self.join_logs(list(self.dfs.keys()))
