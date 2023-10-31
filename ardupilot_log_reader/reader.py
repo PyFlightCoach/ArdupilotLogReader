@@ -155,35 +155,11 @@ class Ardupilot(object):
         self.dfs = {}
         for k, v in dfs_dicts.items():
             self.dfs[k] = pd.DataFrame(v)
-            self.dfs[k].columns = [val if val == "timestamp" else k + val for val in v.keys()]        
-        self.parms = self.dfs['PARM'].set_index('PARMName')['PARMValue'].to_dict()
+            #self.dfs[k].columns = list(v.keys())#[val if val == "timestamp" else k + val for val in v.keys()]        
+        self.parms = self.dfs['PARM'].set_index('Name')['Value'].to_dict()
 
     def __getattr__(self, name):
         if name in self.dfs:
             return self.dfs[name]
         raise AttributeError(f"No such attribute: {name}")
     
-    def join_logs(self, titles):
-        """Merge logs on timestamp 
-        """
-        joined_log = self.dfs[titles[0]]
-        for title in titles[1:]:
-            if title=='PARM':
-                continue
-            joined_log = pd.merge_asof(
-                joined_log, 
-                self.dfs[title], 
-                on='timestamp'
-            )
-
-        return joined_log
-
-    @staticmethod
-    def join_dfs(dfs: list[pd.DataFrame]):
-        joined_log = dfs[0]
-        for df in dfs[1:]:
-            joined_log = pd.merge_asof(joined_log, df, on='timestamp')
-        return joined_log
-
-    def full_df(self):
-        return self.join_logs(list(self.dfs.keys()))
