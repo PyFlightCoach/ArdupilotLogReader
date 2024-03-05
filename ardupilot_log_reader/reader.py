@@ -18,26 +18,10 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 '''
 
 from __future__ import print_function
-
-import array
 import fnmatch
-import json
 import os
-import struct
-import sys
-import time
-
+import numpy as np
 import pandas as pd
-
-try:
-    from pymavlink.mavextra import *
-except:
-    print("WARNING: Numpy missing, mathematical notation will not be supported..")
-
-from argparse import ArgumentParser
-
-import inspect
-
 from pymavlink import mavutil
 
 
@@ -79,7 +63,7 @@ class Ardupilot(object):
         if not mav10:
             os.environ['MAVLINK20'] = '1'
 
-        filename = bin_file
+        filename = str(bin_file)
         mlog = mavutil.mavlink_connection(filename, planner_format=planner,
                                   notimestamps=no_timestamps,
                                   robust_parsing=robust,
