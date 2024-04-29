@@ -17,105 +17,97 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from __future__ import print_function
+from __future__ import print_function, annotations
 import fnmatch
 import os
-import numpy as np
 import pandas as pd
 from pymavlink import mavutil
+from  dataclasses import dataclass
+from pymavlink.DFReader import DFReader_binary
 
 
+
+@dataclass
 class Ardupilot(object):
+    filename: str
+    dfs: dict[str, pd.DataFrame]
 
-    def __init__(
-        self, 
+    def __getattr__(self, name):
+        if name in self.dfs:
+            return self.dfs[name]
+        raise AttributeError(f"No such attribute: {name}")
+
+    @staticmethod
+    def process_patterns(available: list[str], patterns:list[str] = None, exclude_patterns: list[str]=None):
+        def match_type(mtype, patterns):
+            for p in patterns:
+                if fnmatch.fnmatch(mtype, p):
+                    return True
+            return False
+        patterns = available if patterns is None else patterns
+        exclude_patterns = [] if exclude_patterns is None else exclude_patterns
+        return [k for k in available if match_type(k, patterns) and not match_type(k, exclude_patterns)]
+
+    @staticmethod
+    def parse( 
         bin_file, 
-        no_timestamps=False,
-        planner=False,
-        robust=False,
-        condition=None,
-        types=None,
-        nottypes=None,
-        dialect="ardupilotmega",
+        types=None, nottypes=None,
         zero_time_base=False,
         source_system=None,
         source_component=None,
         link=None,
         mav10=False
-        ):
-        ''' 
-            parser.add_argument("--no-timestamps", dest="notimestamps", action='store_true', help="Log doesn't have timestamps")
-            parser.add_argument("--planner", action='store_true', help="use planner file format")
-            parser.add_argument("--robust", action='store_true', help="Enable robust parsing (skip over bad data)")
-            parser.add_argument("--condition", default=None, help="select packets by condition")
-            parser.add_argument("--types", default=None, help="types of messages (comma separated with wildcard)")
-            parser.add_argument("--nottypes", default=None, help="types of messages not to include (comma separated with wildcard)")
-            parser.add_argument("--dialect", default="ardupilotmega", help="MAVLink dialect")
-            parser.add_argument("--zero-time-base", action='store_true', help="use Z time base for DF logs")
-            parser.add_argument("--source-system", type=int, default=None, help="filter by source system ID")
-            parser.add_argument("--source-component", type=int, default=None, help="filter by source component ID")
-            parser.add_argument("--link", type=int, default=None, help="filter by comms link ID")
-            parser.add_argument("--mav10", action='store_true', help="parse as MAVLink1")
-            parser.add_argument("log", metavar="LOG")
-        '''
+        ) -> Ardupilot:
+        """
+        Parses a binary file into an Ardupilot object.
 
-        self._parms = None
+        Parameters:
+        bin_file (str): The binary file to parse.
+        types (list[str], optional): List of types or patterns to include in the parsing. Defaults to None.
+        nottypes (list[str], optional): List of types or patterns to exclude from the parsing. Defaults to None.
+        zero_time_base (bool, optional): If True, sets the time base to zero. Defaults to False.
+        source_system (int, optional): The source system ID to filter messages by. Defaults to None (all systems in log).
+        source_component (int, optional): The source component ID to filter messages by. Defaults to None (all components in log).
+        link (int, optional): The link to filter messages by. Defaults to None.
+        mav10 (bool, optional): If True, uses MAVLink 1.0. Defaults to False.
+
+        Returns:
+        Ardupilot: The parsed Ardupilot object.
+        """
         if not mav10:
             os.environ['MAVLINK20'] = '1'
 
         filename = str(bin_file)
-        mlog = mavutil.mavlink_connection(filename, planner_format=planner,
-                                  notimestamps=no_timestamps,
-                                  robust_parsing=robust,
-                                  dialect=dialect,
-                                  zero_time_base=zero_time_base)
+        
+        mlog: DFReader_binary = DFReader_binary(filename, zero_time_base=zero_time_base)
+        
+        match_types = Ardupilot.process_patterns(
+            list(mlog.name_to_id.keys()), 
+            list(set(types + ['PARM'])), 
+            nottypes
+        )
 
+        log = Ardupilot._parse(mlog, match_types, source_system, source_component, link)
+        
+        mlog.filehandle.close()
 
-        types = list(set(types + ['PARM']))
-
-        if nottypes is not None:
-            nottypes = nottypes.split(',')
-
-        def match_type(mtype, patterns):
-            '''return True if mtype matches pattern'''
-            for p in patterns:
-                if fnmatch.fnmatch(mtype, p):
-                    return True
-            return False
-
-        # for DF logs pre-calculate types list
-        match_types=None
-        if types is not None and hasattr(mlog, 'name_to_id'):
-            for k in mlog.name_to_id.keys():
-                if match_type(k, types):
-                    if nottypes is not None and match_type(k, nottypes):
-                        continue
-                    if match_types is None:
-                        match_types = []
-                    match_types.append(k)
-
+        return log
+    
+    @staticmethod
+    def _parse(mlog: DFReader_binary, cols: list[str], src_system=None, src_component=None, link=None):
         dfs_dicts = {}
 
-        self.read_types = types
-
         while True:
-            m = mlog.recv_match(blocking=False, type=match_types)
+            m = mlog.recv_match(blocking=False, type=cols)
             if m is None:
                 break
-
-            if not mavutil.evaluate_condition(condition, mlog.messages):
+            if src_system is not None and src_system != m.get_srcSystem():
                 continue
-            if source_system is not None and source_system != m.get_srcSystem():
-                continue
-            if source_component is not None and source_component != m.get_srcComponent():
+            if src_component is not None and src_component != m.get_srcComponent():
                 continue
             if link is not None and link != m._link:
                 continue
-            if types is not None and m.get_type() != 'BAD_DATA' and not match_type(m.get_type(), types):
-                continue
-            if nottypes is not None and match_type(m.get_type(), nottypes):
-                continue
-
+            
             # Ignore BAD_DATA messages is the user requested or if they're because of a bad prefix. The
             # latter case is normally because of a mismatched MAVLink version.
             if m.get_type() == 'BAD_DATA':
@@ -123,7 +115,7 @@ class Ardupilot(object):
 
             key=m.get_type()
 
-            if not key in dfs_dicts:
+            if key not in dfs_dicts:
                 dfs_dicts[key] = {}
                 dfs_dicts[key]['timestamp'] = []
                 for field in m.get_fieldnames():
@@ -134,16 +126,15 @@ class Ardupilot(object):
             for field in m.get_fieldnames():
                 dfs_dicts[key][field].append( getattr(m,field) )
         
-        mlog.filehandle.close()
+        return Ardupilot(mlog.filehandle.name, {k: pd.DataFrame(v) for k, v in dfs_dicts.items()})
 
-        self.dfs = {}
-        for k, v in dfs_dicts.items():
-            self.dfs[k] = pd.DataFrame(v)
-            #self.dfs[k].columns = list(v.keys())#[val if val == "timestamp" else k + val for val in v.keys()]        
-        self.parms = self.dfs['PARM'].set_index('Name')['Value'].to_dict()
+    def parameters(self):
+        gb = self.PARM.groupby('Name')
 
-    def __getattr__(self, name):
-        if name in self.dfs:
-            return self.dfs[name]
-        raise AttributeError(f"No such attribute: {name}")
+        parms = {}
+        for gn in gb.groups.keys():
+            gr = gb.get_group(gn)
+            parms[gb] = gr.loc[abs(gr.Value.diff().fillna(1)) > 0, ["timestamp", "TimeUS", "Value"]].set_index('timestamp')
+        return parms
+        
     

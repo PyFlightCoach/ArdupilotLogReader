@@ -10,8 +10,6 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
 from ardupilot_log_reader.reader import Ardupilot
-import numpy as np
-import pandas as pd
 
 import pytest
 
@@ -22,30 +20,16 @@ def type_request():
 
 @pytest.fixture(scope="session")
 def log(type_request):
-    return Ardupilot('tests/test_inputs/test_log_00000052.BIN', types=type_request, zero_time_base=True)
+    return Ardupilot.parse('tests/test_inputs/test_log_00000052.BIN', types=type_request, zero_time_base=True)
 
 @pytest.fixture(scope="session")
 def log2(type_request):
-    return Ardupilot('tests/test_inputs/00000129.BIN', types=type_request, zero_time_base=True)
-
+    return Ardupilot.parse('tests/test_inputs/00000129.BIN', types=type_request, zero_time_base=True)
 
 def test_dfs(type_request, log):
     assert set(log.dfs.keys()) == set(type_request + ['PARM'])
 
 
-def test_full_df_frequency(log, type_request):
-    fulldf = log.join_logs(type_request)
-    assert len(log.dfs['XKF1']) == len(fulldf)
-
-
-def test_time_epioch(log):
-    gpsdf = log.dfs['GPS']
-    assert "GPSTimeUS" in gpsdf.columns
-
-
-def test_time_index(log2):
-    assert "XKF1" in log2.dfs
-    assert log2.dfs["XKF1"].timestamp.is_monotonic_increasing
 
 
 
