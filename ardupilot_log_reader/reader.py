@@ -21,10 +21,8 @@ from __future__ import print_function, annotations
 import fnmatch
 import os
 import pandas as pd
-from pymavlink import mavutil
 from  dataclasses import dataclass
 from pymavlink.DFReader import DFReader_binary
-
 
 
 @dataclass
@@ -53,9 +51,7 @@ class Ardupilot(object):
         bin_file, 
         types=None, nottypes=None,
         zero_time_base=False,
-        source_system=None,
-        source_component=None,
-        link=None,
+        source_system=None, source_component=None, link=None,
         mav10=False
         ) -> Ardupilot:
         """
@@ -77,9 +73,7 @@ class Ardupilot(object):
         if not mav10:
             os.environ['MAVLINK20'] = '1'
 
-        filename = str(bin_file)
-        
-        mlog: DFReader_binary = DFReader_binary(filename, zero_time_base=zero_time_base)
+        mlog: DFReader_binary = DFReader_binary(str(bin_file), zero_time_base=zero_time_base)
         
         match_types = Ardupilot.process_patterns(
             list(mlog.name_to_id.keys()), 
@@ -94,7 +88,7 @@ class Ardupilot(object):
         return log
     
     @staticmethod
-    def _parse(mlog: DFReader_binary, cols: list[str], src_system=None, src_component=None, link=None):
+    def _parse(mlog, cols: list[str], src_system=None, src_component=None, link=None):
         dfs_dicts = {}
 
         while True:
@@ -134,7 +128,7 @@ class Ardupilot(object):
         parms = {}
         for gn in gb.groups.keys():
             gr = gb.get_group(gn)
-            parms[gb] = gr.loc[abs(gr.Value.diff().fillna(1)) > 0, ["timestamp", "TimeUS", "Value"]].set_index('timestamp')
+            parms[gn] = gr.loc[abs(gr.Value.diff().fillna(1)) > 0, ["timestamp", "TimeUS", "Value"]].set_index('timestamp')
         return parms
         
     
