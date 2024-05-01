@@ -48,11 +48,8 @@ class Ardupilot(object):
 
     @staticmethod
     def parse( 
-        bin_file, 
-        types=None, nottypes=None,
-        zero_time_base=False,
-        source_system=None, source_component=None, link=None,
-        mav10=False
+            bin_file, types=None, nottypes=None, zero_time_base=False, 
+            source_system=None, source_component=None, link=None, mav10=False
         ) -> Ardupilot:
         """
         Parses a binary file into an Ardupilot object.
@@ -101,15 +98,12 @@ class Ardupilot(object):
                 continue
             if link is not None and link != m._link:
                 continue
-            
-            # Ignore BAD_DATA messages is the user requested or if they're because of a bad prefix. The
-            # latter case is normally because of a mismatched MAVLink version.
-            if m.get_type() == 'BAD_DATA':
-                continue
 
             key=m.get_type()
-
+            
             if key not in dfs_dicts:
+                if key == 'BAD_DATA':
+                    continue          
                 dfs_dicts[key] = {}
                 dfs_dicts[key]['timestamp'] = []
                 for field in m.get_fieldnames():
@@ -122,7 +116,7 @@ class Ardupilot(object):
         
         return Ardupilot(mlog.filehandle.name, {k: pd.DataFrame(v) for k, v in dfs_dicts.items()})
 
-    def parameters(self):
+    def parameters(self) -> dict[str, pd.DataFrame]:
         gb = self.PARM.groupby('Name')
 
         parms = {}
