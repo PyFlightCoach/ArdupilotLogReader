@@ -6,7 +6,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ardupilot_log_reader"
+name = "ardupilot-log-reader"
 authors = [{name = "Thomas David", email = "thomasdavid0@gmail.com"}]
 description = "module to read ardupilot binary logs to memory"
 readme = "ReadMe.md"
