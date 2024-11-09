@@ -10,7 +10,7 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
 from ardupilot_log_reader.reader import Ardupilot
-
+from pathlib import Path
 import pytest
 
 
@@ -20,11 +20,11 @@ def type_request():
 
 @pytest.fixture(scope="session")
 def log(type_request):
-    return Ardupilot.parse('tests/test_inputs/test_log_00000052.BIN', types=type_request, zero_time_base=True)
+    return Ardupilot.parse(Path(__file__).parent / 'test_inputs/test_log_00000052.BIN', types=type_request, zero_time_base=True)
 
 @pytest.fixture(scope="session")
 def log2(type_request):
-    return Ardupilot.parse('tests/test_inputs/00000129.BIN', types=type_request, zero_time_base=True)
+    return Ardupilot.parse(Path(__file__).parent / 'test_inputs/00000129.BIN', types=type_request, zero_time_base=True)
 
 def test_dfs(type_request, log):
     assert set(log.dfs.keys()) == set(type_request + ['PARM'])
