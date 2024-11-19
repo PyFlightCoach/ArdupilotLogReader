@@ -6,7 +6,7 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       
 jobs:
-
+              
   build:
     name: Build and publish distribution
     runs-on: ubuntu-latest
@@ -18,11 +18,11 @@ jobs:
         - name: Get Branch
           run: |
             branch=$(git branch -r --contains ${{ github.ref }} --format "%(refname:lstrip=3)")
-            echo "branch=$branch" >> $GITHUB_OUTPUT
+            echo ::set-env name=BRANCH::$branch
           id: get_branch
         
         - name: echo branch name
-          run: echo ${{ steps.get_branch.outputs.branch }}
+          run: echo ${{ env.BRANCH }}
 
         - name: Install uv
           uses: astral-sh/setup-uv@v3
@@ -37,9 +37,9 @@ jobs:
           run: uv build
         
         - name: Publish to PyPI
-          if: ${{steps.get_branch.outputs.branch  == 'main'}}
+          if: ${{env.BRANCH  == 'main'}}
           run: uv publish -t ${{ secrets.PYPI_TOKEN }}
           
         - name: Publish to TestPyPI
-          if: ${{steps.get_branch.outputs.branch == 'dev'}}
+          if: ${{env.BRANCH == 'dev'}}
           run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }} --publish-url https://test.pypi.org/legacy/
