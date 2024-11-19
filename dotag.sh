@@ -10,5 +10,6 @@ git add --all
 git commit -m "Update Version"
 git push
 git push --delete origin $NEXTVERSION
+sleep 0.2
 git tag -a v${NEXTVERSION} -m "Update Version"
 git push origin v${NEXTVERSION}
