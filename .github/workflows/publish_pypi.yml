@@ -30,9 +30,9 @@ jobs:
           run: echo ${{ github.ref_name }}
 
         - name: Publish to PyPI
-          if: contains(github.ref_name, 'main')
+          if: ${{github.ref_name == 'main'}}
           run: uv publish -t ${{ secrets.PYPI_TOKEN }}
           
         - name: Publish to TestPyPI
-          if: contains(github.ref_name, 'dev')
-          run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }}
+          if: ${{github.ref_name == 'dev'}}
+          run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }} --publish-url https://test.pypi.org/legacy/
