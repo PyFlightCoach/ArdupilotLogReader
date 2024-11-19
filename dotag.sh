@@ -8,8 +8,5 @@ echo "Next version: ${NEXTVERSION}"
 
 git add --all
 git commit -m "Update Version"
-git push --delete origin $NEXTVERSION
-sleep 1.0
-git push
 git tag -a v${NEXTVERSION} -m "Update Version"
-git push origin v${NEXTVERSION}
+git push

@@ -2,27 +2,20 @@ name: Publish to PyPI and TestPyPI
 
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+    branches:
+      - 'dev'
       
 jobs:
-              
   build:
     name: Build and publish distribution
     runs-on: ubuntu-latest
-
     steps:
         - name: Checkout repo
           uses: actions/checkout@v4
 
-        - name: Get Branch
-          run: |
-            branch=$(git branch -r --contains ${{ github.ref }} --format "%(refname:lstrip=3)")
-            echo "branch=$branch" >> $GITHUB_OUTPUT
-          id: get_branch
-        
-        - name: echo branch name
-          run: echo ${{ steps.get_branch.output.branch }}
+        - name: Get tag
+          run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+          id: get_tag       
 
         - name: Install uv
           uses: astral-sh/setup-uv@v3
@@ -35,11 +28,6 @@ jobs:
   
         - name: Build
           run: uv build
-        
-        - name: Publish to PyPI
-          if: ${{steps.get_branch.output.branch == 'main'}}
-          run: uv publish -t ${{ secrets.PYPI_TOKEN }}
-          
+
         - name: Publish to TestPyPI
-          if: ${{steps.get_branch.output.branch == 'dev'}}
           run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }} --publish-url https://test.pypi.org/legacy/
