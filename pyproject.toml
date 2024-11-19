@@ -1,18 +1,15 @@
 [project]
 name = "ardupilot_log_reader"
+version = "v0.3.5"
 description = "module to read ardupilot binary logs to memory"
 readme = "README.md"
 authors = [{ name = "Thomas David", email = "thomasdavid0@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = ["numpy>=2.1.3", "pandas>=2.2.3", "pymavlink>=2.4.42"]
-dynamic = ["version"]
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "vcs"
 
 
 [dependency-groups]
