@@ -14,6 +14,14 @@ jobs:
     steps:
         - uses: actions/checkout@v4
   
+        - name: Extract branch name
+          shell: bash
+          run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+          id: extract_branch
+        
+        - name: echo branch name
+          run: echo ${{ steps.extract_branch.outputs.branch }}
+
         - name: Install uv
           uses: astral-sh/setup-uv@v3
           with:
@@ -26,13 +34,10 @@ jobs:
         - name: Build
           run: uv build
         
-        - name: echo ${{ github.ref_name }}
-          run: echo ${{ github.ref_name }}
-
         - name: Publish to PyPI
-          if: ${{github.ref_name == 'main'}}
+          if: ${{steps.extract_branch.outputs.branch  == 'main'}}
           run: uv publish -t ${{ secrets.PYPI_TOKEN }}
           
         - name: Publish to TestPyPI
-          if: ${{github.ref_name == 'dev'}}
+          if: ${{steps.extract_branch.outputs.branch == 'dev'}}
           run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }} --publish-url https://test.pypi.org/legacy/
