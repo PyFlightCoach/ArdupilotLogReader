@@ -7,47 +7,24 @@ on:
       - dev
 jobs:
   build:
-    name: Build distribution
+    name: Build and publish distribution
     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version-file: "pyproject.toml"
 
-    - name: Install dependencies
-      run: pip install .
-    
-    - name: Install pypa / build
-      run: python3 -m pip install build --user
-    
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
+    steps:
+        - uses: actions/checkout@v4
   
-  publish-to-test-pypi:
-    name: Publish Python distribution to PyPI
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/ardupilot-log-reader
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
-
-    steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+        - name: Install uv
+          uses: astral-sh/setup-uv@v3
+          with:
+            enable-cache: true
+            cache-dependency-glob: uv.lock
+  
+        - name: Set up Python
+          run: uv python install 3.12  # Or whatever version I want to use.
+  
+        - name: Build
+          run: uv build
+  
+        - name: Publish
+          run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }} --publish-url https://test.pypi.org/legacy/
