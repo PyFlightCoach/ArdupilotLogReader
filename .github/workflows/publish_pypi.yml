@@ -16,7 +16,7 @@ jobs:
           uses: actions/checkout@v4
 
         - name: Get Branch
-          run: echo ::set-output name=branch::$(git branch -r --contains ${{ github.ref }} --format "%(refname:lstrip=3)")
+          run: echo branch::$(git branch -r --contains ${{ github.ref }} --format "%(refname:lstrip=3)") >> $GITHUB_OUTPUT
           id: get_branch
         
         - name: echo branch name
@@ -35,7 +35,7 @@ jobs:
           run: uv build
         
         - name: Publish to PyPI
-          if: ${{steps.get_branch.output.branch  == 'main'}}
+          if: ${{steps.get_branch.output.branch == 'main'}}
           run: uv publish -t ${{ secrets.PYPI_TOKEN }}
           
         - name: Publish to TestPyPI
