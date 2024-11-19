@@ -2,16 +2,39 @@ name: Publish to PyPI and TestPyPI
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+      
 jobs:
+
+  # @see https://stackoverflow.com/a/72959712/8179249
+  check-current-branch:
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.check_step.outputs.branch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get current branch
+        id: check_step
+        # 1. Get the list of branches ref where this tag exists
+        # 2. Remove 'origin/' from that result
+        # 3. Put that string in output
+        # => We can now use function 'contains(list, item)''
+        run: |
+          raw=$(git branch -r --contains ${{ github.ref }})
+          branch="$(echo ${raw//origin\//} | tr -d '\n')"
+          echo "{name}=branch" >> $GITHUB_OUTPUT
+          echo "Branches where this tag exists : $branch."
+
   build:
     name: Build and publish distribution
     runs-on: ubuntu-latest
-
-
+    needs: check-current-branch
+    
     steps:
         - uses: actions/checkout@v4
   
@@ -26,6 +49,11 @@ jobs:
   
         - name: Build
           run: uv build
-  
-        - name: Publish
+        
+        - name: Publish to PyPI
+          if: contains(needs.check-current-branch.outputs.branch, 'main')
           run: uv publish -t ${{ secrets.PYPI_TOKEN }}
+          
+        - name: Publish to TestPyPI
+          if: contains(needs.check-current-branch.outputs.branch, 'dev')
+          run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }}
