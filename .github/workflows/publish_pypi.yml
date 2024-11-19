@@ -16,7 +16,9 @@ jobs:
           uses: actions/checkout@v4
 
         - name: Get Branch
-          run: echo branch::$(git branch -r --contains ${{ github.ref }} --format "%(refname:lstrip=3)") >> $GITHUB_OUTPUT
+          run: |
+            branch=$(git branch -r --contains ${{ github.ref }} --format "%(refname:lstrip=3)")
+            echo "branch=$branch" >> $GITHUB_OUTPUT
           id: get_branch
         
         - name: echo branch name
