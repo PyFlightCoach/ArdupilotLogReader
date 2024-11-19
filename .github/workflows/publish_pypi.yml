@@ -2,8 +2,8 @@ name: Publish to PyPI and TestPyPI
 
 on:
   push:
-    branches:
-      - 'dev'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
       
 jobs:
   build:
@@ -12,31 +12,6 @@ jobs:
     steps:
         - name: Checkout repo
           uses: actions/checkout@v4
-
-        - name: Get tag
-          run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-          id: current_tag
-        
-        - name: Get Last Tag
-          run: |
-            VERSION=$(git tag --sort=committerdate | grep -E '[0-9]' | tail -1 | cut -b 2-7)
-            echo "RELEASE_VERSION=$(VERSION)" >> $GITHUB_OUTPUT
-          id: last_major
-
-        - name: Get Next Version
-          run: |
-            NEXTVERSION=$(echo ${VERSION} | awk -F. -v OFS=. '{$NF += 1 ; print}')
-            echo "RELEASE_VERSION=$(VERSION)" >> $GITHUB_OUTPUT
-          id: next_version
-
-        - name: echo current version
-          run: echo ${{ steps.current_tag.outputs.RELEASE_VERSION }}
-        
-        - name: echo last major tag
-          run: echo ${{ steps.last_major.outputs.RELEASE_VERSION }}
-        
-        - name: echo next major tag
-          run: echo ${{ steps.last_major.outputs.RELEASE_VERSION }}
  
         - name: Install uv
           uses: astral-sh/setup-uv@v3
@@ -50,6 +25,5 @@ jobs:
         - name: Build
           run: uv build
         
-        - name: Publish to TestPyPI
-          if: ${{steps.last_major.outputs.RELEASE_VERSION == steps.current_tag.outputs.RELEASE_VERSION}}
-          run: uv publish -t ${{ secrets.TEST_PYPI_TOKEN }} --publish-url https://test.pypi.org/legacy/
+        - name: Publish to PyPI
+          run: uv publish -t ${{ secrets.PYPI_TOKEN }} --publish-url https://pypi.org/
