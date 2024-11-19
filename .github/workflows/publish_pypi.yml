@@ -26,6 +26,9 @@ jobs:
         - name: Build
           run: uv build
         
+        - name: echo ${{ github.ref_name }}
+          run: echo ${{ github.ref_name }}
+
         - name: Publish to PyPI
           if: contains(github.ref_name, 'main')
           run: uv publish -t ${{ secrets.PYPI_TOKEN }}
