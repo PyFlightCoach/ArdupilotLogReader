@@ -3,7 +3,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "ardupilot-log-reader"
-version = "0.3.4.dev0+gf252c32.d20241109"
+version = "0.3.6.dev0+g055c96f.d20241119"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },

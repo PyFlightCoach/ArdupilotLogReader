@@ -1,53 +1,31 @@
-#https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
 name: Publish to PyPI and TestPyPI
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 jobs:
   build:
-    name: Build distribution
+    name: Build and publish distribution
     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version-file: "pyproject.toml"
 
-    - name: Install dependencies
-      run: pip install .
-    
-    - name: Install pypa / build
-      run: python3 -m pip install build --user
-    
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
+    steps:
+        - uses: actions/checkout@v4
   
-  publish-to-pypi:
-    name: Publish Python distribution to PyPI
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/<package-name>
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
-
-    steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+        - name: Install uv
+          uses: astral-sh/setup-uv@v3
+          with:
+            enable-cache: true
+            cache-dependency-glob: uv.lock
+  
+        - name: Set up Python
+          run: uv python install 3.12
+  
+        - name: Build
+          run: uv build
+  
+        - name: Publish
+          run: uv publish -t ${{ secrets.PYPI_TOKEN }}
