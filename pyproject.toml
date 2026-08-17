@@ -11,6 +11,10 @@ dependencies = [
     "pymavlink>=2.4.42",
 ]
 
+
+[project.optional-dependencies]
+pymavlink = ["pymavlink>=2.4.42"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

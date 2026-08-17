@@ -1,32 +1,28 @@
-#!/usr/bin/env python
-
-'''
-example program that dumps a Mavlink log file. The log file is
-assumed to be in the format that qgroundcontrol uses, which consists
-of a series of MAVLink packets, each with a 64 bit timestamp
-header. The timestamp is in microseconds since 1970 (unix epoch)
-
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with
-this program. If not, see <http://www.gnu.org/licenses/>.
-'''
-
 from __future__ import annotations
+
+import base64
 import fnmatch
+import logging
 import os
+from dataclasses import dataclass
+from typing import Literal
+
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
-from  dataclasses import dataclass
-from pymavlink.DFReader import DFReader_binary
+
+try:
+    from pymavlink.DFReader import DFReader_binary
+    HAS_PYMAVLINK = True
+except ImportError:
+    type DFReader_binary = None
+    HAS_PYMAVLINK = False
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Ardupilot(object):
+class Ardupilot:
     filename: str
     dfs: dict[str, pd.DataFrame]
 
@@ -36,21 +32,36 @@ class Ardupilot(object):
         raise AttributeError(f"No such attribute: {name}")
 
     @staticmethod
-    def process_patterns(available: list[str], patterns:list[str] = None, exclude_patterns: list[str]=None):
+    def process_patterns(
+        available: list[str],
+        patterns: list[str] | None = None,
+        exclude_patterns: list[str] | None = None,
+    ):
         def match_type(mtype, patterns):
             for p in patterns:
                 if fnmatch.fnmatch(mtype, p):
                     return True
             return False
+
         patterns = available if patterns is None else patterns
         exclude_patterns = [] if exclude_patterns is None else exclude_patterns
-        return [k for k in available if match_type(k, patterns) and not match_type(k, exclude_patterns)]
+        return [
+            k
+            for k in available
+            if match_type(k, patterns) and not match_type(k, exclude_patterns)
+        ]
 
     @staticmethod
-    def parse( 
-            bin_file, types=None, nottypes=None, zero_time_base=False, 
-            source_system=None, source_component=None, link=None, mav10=False
-        ) -> Ardupilot:
+    def parse(
+        bin_file,
+        types=None,
+        nottypes=None,
+        zero_time_base=False,
+        source_system=None,
+        source_component=None,
+        link=None,
+        mav10=False,
+    ) -> Ardupilot:
         """
         Parses a binary file into an Ardupilot object.
 
@@ -67,25 +78,35 @@ class Ardupilot(object):
         Returns:
         Ardupilot: The parsed Ardupilot object.
         """
+        if not HAS_PYMAVLINK:
+            raise ImportError(
+                "pymavlink is required to parse Ardupilot logs. Please install it."
+            )
         if not mav10:
-            os.environ['MAVLINK20'] = '1'
+            os.environ["MAVLINK20"] = "1"
 
-        mlog: DFReader_binary = DFReader_binary(str(bin_file), zero_time_base=zero_time_base)
-        
+        mlog: DFReader_binary = DFReader_binary(
+            str(bin_file), zero_time_base=zero_time_base
+        )
+
         match_types = Ardupilot.process_patterns(
-            list(mlog.name_to_id.keys()), 
-            list(set(types + ['PARM'])), 
-            nottypes
+            list(mlog.name_to_id.keys()), list(set(types + ["PARM"])), nottypes
         )
 
         log = Ardupilot._parse(mlog, match_types, source_system, source_component, link)
-        
+
         mlog.filehandle.close()
 
         return log
-    
+
     @staticmethod
-    def _parse(mlog, cols: list[str], src_system=None, src_component=None, link=None):
+    def _parse(
+        mlog: DFReader_binary,
+        cols: list[str],
+        src_system=None,
+        src_component=None,
+        link=None,
+    ):
         dfs_dicts = {}
 
         while True:
@@ -99,30 +120,160 @@ class Ardupilot(object):
             if link is not None and link != m._link:
                 continue
 
-            key=m.get_type()
-            
+            key = m.get_type()
+
             if key not in dfs_dicts:
-                if key == 'BAD_DATA':
-                    continue          
+                if key == "BAD_DATA":
+                    continue
                 dfs_dicts[key] = {}
-                dfs_dicts[key]['timestamp'] = []
+                dfs_dicts[key]["timestamp"] = []
                 for field in m.get_fieldnames():
                     dfs_dicts[key][field] = []
-            
-            dfs_dicts[key]['timestamp'].append( getattr(m,'_timestamp', 0.0) )
-            
+
+            dfs_dicts[key]["timestamp"].append(getattr(m, "_timestamp", 0.0))
+
+            if key == "XKF2":
+                pass
+
             for field in m.get_fieldnames():
-                dfs_dicts[key][field].append( getattr(m,field) )
-        
-        return Ardupilot(mlog.filehandle.name, {k: pd.DataFrame(v) for k, v in dfs_dicts.items()})
+                dfs_dicts[key][field].append(getattr(m, field))
+
+        return Ardupilot(
+            mlog.filehandle.name, {k: pd.DataFrame(v) for k, v in dfs_dicts.items()}
+        )._correct_timestamps()
 
     def parameters(self) -> dict[str, pd.DataFrame]:
-        gb = self.PARM.groupby('Name')
+        gb = self.PARM.groupby("Name")
 
         parms = {}
-        for gn in gb.groups.keys():
+        for gn in gb.groups:
             gr = gb.get_group(gn)
-            parms[gn] = gr.loc[abs(gr.Value.diff().fillna(1)) > 0, ["timestamp", "TimeUS", "Value"]].set_index('timestamp')
+            parms[gn] = gr.loc[
+                abs(gr.Value.diff().fillna(1)) > 0, ["timestamp", "TimeUS", "Value"]
+            ].set_index("timestamp")
         return parms
+
+    def to_dict(self, **kwargs) -> dict[str, dict[str, list]]:
+        return {
+            "filename": self.filename,
+            "data": {k: Ardupilot.write_df(v, **kwargs) for k, v in self.dfs.items()},
+        }
+
+    @staticmethod
+    def write_df(df: pd.DataFrame, **kwargs) -> dict[str, list | str]:
+        return {k: Ardupilot.write_column(v, **kwargs) for k, v in df.items()}
+
+    @staticmethod
+    def write_column(
+        data: pd.Series, mode: Literal["list", "base64", "records"] = "base64"
+    ) -> str | list | dict:
+        if mode == "records":
+            return data.to_dict(orient="records")
+        elif mode == "list":
+            return data.to_dict(orient="list")
+        elif mode == "base64":
+            if data.dtype == np.float64:
+                return base64.b64encode(data.to_numpy().tobytes()).decode("utf-8")
+            else:
+                return data.tolist()
+
+    @staticmethod
+    def from_dict(data: dict[str, dict[str, list]]) -> Ardupilot:
+
+        if "filename" in data and "data" in data:
+            return Ardupilot._from_dict(data)
+        else:
+            return Ardupilot._from_web_dict(data)
+
+    @staticmethod
+    def _from_dict(data: dict[str, dict[str, list]]) -> Ardupilot:
+        return Ardupilot(
+            data["filename"],
+            {k: Ardupilot.parse_df(v) for k, v in data["data"].items()},
+        )
+
+    @staticmethod
+    def _from_web_dict(bindata: dict[str, dict[str, list]]) -> Ardupilot:
+        # dfs = {k: pd.DataFrame(v) for k,v in bindata.items()}
+
+        dfs: dict[str, pd.DataFrame] = {}
+        groups = {}
+        for k, v in bindata.items():
+            new_df = Ardupilot.parse_df(v)
+            if new_df is not None:
+                if "[" not in k:
+                    dfs[k] = new_df
+                else:
+                    nk = k.split("[")[0]
+                    if nk not in groups:
+                        groups[nk] = []
+                    groups[nk].append(new_df)
+
+        for k, v in groups.items():
+            dfs[k] = pd.concat(v)
+            colsort = ["time_boot_s"]
+            for core_col in ["I", "C"]:
+                if core_col in dfs[k].columns:
+                    colsort.append(core_col)
+                    break
+            dfs[k] = dfs[k].sort_values(colsort)
+
+        def process_df(df: pd.DataFrame) -> pd.DataFrame:
+            df.insert(0, "TimeUS", np.floor(df.time_boot_s * 1e6).astype(int))  # ms
+            df.insert(0, "timestamp", df.time_boot_s)
+
+            return df.drop(columns="time_boot_s")
+
+        dfs = {k: process_df(v) for k, v in dfs.items() if not v.empty}
+
+        return Ardupilot("web_dfs", dfs)._correct_timestamps()
+
+    def _correct_timestamps(self):
+        if "GPS" in self.dfs:
+            gps = self.dfs["GPS"]
+
+            start_time = (
+                Ardupilot._gpsTimeToTime(
+                    gps.GWk.iloc[0],
+                    gps.GMS.iloc[0] / 1e3
+                    if gps.GMS.diff().mean() > 10
+                    else gps.GMS.iloc[0],
+                )
+                - (gps.TimeUS / 1e6).iloc[0]
+            )
+        else:
+            start_time = 0
+
+        return Ardupilot(
+            self.filename,
+            {
+                k: v.assign(timestamp=v.timestamp + start_time)
+                for k, v in self.dfs.items()
+            },
+        )
+
+    @staticmethod
+    def _gpsTimeToTime(week, msec):
+        """convert GPS week and TOW to a time in seconds since 1970"""
+        epoch = 86400 * (10 * 365 + int((1980 - 1969) / 4) + 1 + 6 - 2)
+        return epoch + 86400 * 7 * week + msec * 0.001 - 18
+
+    @staticmethod
+    def parse_df(data: dict[str, list | str], **kwargs) -> pd.DataFrame:
+        df = pd.DataFrame(
+            {k: Ardupilot.process_column(k, v) for k, v in data.items()}, **kwargs
+        )
         
-    
+        return df
+
+    @staticmethod
+    def process_column(name: str, data: str | list | dict) -> pd.Series:
+        if isinstance(data, str):
+            _data = np.frombuffer(base64.b64decode(data), dtype=np.float64)
+            return pd.Series(_data, name=name)
+        elif isinstance(data, list):
+            return pd.Series(data, name=name)
+        elif isinstance(data, dict):
+            return pd.Series(data, name=name).reset_index(drop=True)
+        else:
+            raise TypeError(f"Unsupported data type for column {name}: {type(data)}")
