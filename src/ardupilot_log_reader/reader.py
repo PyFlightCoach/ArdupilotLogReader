@@ -5,6 +5,8 @@ import fnmatch
 import logging
 import os
 from dataclasses import dataclass
+from json import dump, load
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -13,6 +15,7 @@ import pandas as pd
 
 try:
     from pymavlink.DFReader import DFReader_binary
+
     HAS_PYMAVLINK = True
 except ImportError:
     type DFReader_binary = None
@@ -61,6 +64,7 @@ class Ardupilot:
         source_component=None,
         link=None,
         mav10=False,
+        cache_file: str | Path | bool = False,
     ) -> Ardupilot:
         """
         Parses a binary file into an Ardupilot object.
@@ -78,6 +82,19 @@ class Ardupilot:
         Returns:
         Ardupilot: The parsed Ardupilot object.
         """
+        if types is None:
+            types = ["POS", "ATT", "IMU", "XKF1", "XKF2", "ERR", "GPS", "ORGN", "RCOU", "RCIN"]
+        if cache_file:
+            cache_file = (
+                Path(bin_file).with_suffix(".json")
+                if cache_file is True
+                else Path(cache_file)
+            )
+            if cache_file.exists():
+                with open(cache_file, "r") as f:
+                    data = load(f)
+                return Ardupilot.from_dict(data)
+
         if not HAS_PYMAVLINK:
             raise ImportError(
                 "pymavlink is required to parse Ardupilot logs. Please install it."
@@ -96,6 +113,10 @@ class Ardupilot:
         log = Ardupilot._parse(mlog, match_types, source_system, source_component, link)
 
         mlog.filehandle.close()
+
+        if cache_file:
+            with open(cache_file, "w") as f:
+                dump(log.to_dict(), f, indent=4)
 
         return log
 
@@ -263,7 +284,7 @@ class Ardupilot:
         df = pd.DataFrame(
             {k: Ardupilot.process_column(k, v) for k, v in data.items()}, **kwargs
         )
-        
+
         return df
 
     @staticmethod
