@@ -70,6 +70,12 @@ def new_web_bin():
     with open("tests/test_inputs/new_web_bin.json", "r") as f:
         return Ardupilot.from_dict(load(f))
 
+@fixture(scope="session")
+def compressed_web_bin():
+    with open("tests/test_inputs/new_compressed_web_bin.json", "r") as f:
+        return Ardupilot.from_dict(load(f))
+
+
 
 @fixture(scope="session")
 def raw_bin():
@@ -80,22 +86,37 @@ def raw_bin():
     )
 
 
-def test_web_bin(
-    old_web_bin: Ardupilot, new_web_bin: Ardupilot, raw_bin: Ardupilot
-):
-    for k in raw_bin.dfs:
+def assert_dfs_match(bin1: Ardupilot, bin2: Ardupilot):
+    matches = {}
+    throw = False
+    for k in bin1.dfs:
         try:
             pd.testing.assert_frame_equal(
-                raw_bin.dfs[k].reset_index(drop=True),
-                old_web_bin.dfs[k].reset_index(drop=True),
+                bin1.dfs[k].reset_index(drop=True),
+                bin2.dfs[k].reset_index(drop=True),
                 check_dtype=False,
                 rtol=0.1,
             )
-            pd.testing.assert_frame_equal(
-                raw_bin.dfs[k].reset_index(drop=True),
-                new_web_bin.dfs[k].reset_index(drop=True),
-                check_dtype=False,
-                rtol=0.1,
-            )
+            matches[k] = True
         except AssertionError as e:
-            raise ValueError(f"DataFrames for {k} are not equal: {e}") from e
+            matches[k] = f"DataFrames for {k} are not equal: {e}"
+            throw = True
+    if throw:
+        match_summary = "\n".join(
+            [f"\n{v}" for v in matches.values() if v is not True]
+        )
+        raise AssertionError(f"DataFrames {','.join(m for m in matches if matches[m] is not True)} do not match:\n{match_summary}")
+
+
+def test_old_web_bin_matches_raw_bin(raw_bin: Ardupilot, old_web_bin: Ardupilot):
+    assert_dfs_match(raw_bin, old_web_bin)
+
+def test_new_web_bin_matches_raw_bin(
+    raw_bin: Ardupilot, new_web_bin: Ardupilot
+):
+    assert_dfs_match(raw_bin, new_web_bin)
+
+def test_compressed_web_bin_matches_raw_bin(
+    raw_bin: Ardupilot, compressed_web_bin: Ardupilot
+):
+    assert_dfs_match(raw_bin, compressed_web_bin)

@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 
 try:
@@ -83,7 +82,18 @@ class Ardupilot:
         Ardupilot: The parsed Ardupilot object.
         """
         if types is None:
-            types = ["POS", "ATT", "IMU", "XKF1", "XKF2", "ERR", "GPS", "ORGN", "RCOU", "RCIN"]
+            types = [
+                "POS",
+                "ATT",
+                "IMU",
+                "XKF1",
+                "XKF2",
+                "ERR",
+                "GPS",
+                "ORGN",
+                "RCOU",
+                "RCIN",
+            ]
         if cache_file:
             cache_file = (
                 Path(bin_file).with_suffix(".json")
@@ -142,7 +152,8 @@ class Ardupilot:
                 continue
 
             key = m.get_type()
-
+            if key=="POS":
+                pass
             if key not in dfs_dicts:
                 if key == "BAD_DATA":
                     continue
@@ -152,9 +163,6 @@ class Ardupilot:
                     dfs_dicts[key][field] = []
 
             dfs_dicts[key]["timestamp"].append(getattr(m, "_timestamp", 0.0))
-
-            if key == "XKF2":
-                pass
 
             for field in m.get_fieldnames():
                 dfs_dicts[key][field].append(getattr(m, field))
@@ -200,21 +208,19 @@ class Ardupilot:
 
     @staticmethod
     def from_dict(data: dict[str, dict[str, list]]) -> Ardupilot:
-
         if "filename" in data and "data" in data:
-            return Ardupilot._from_dict(data)
+            return Ardupilot(
+                data["filename"],
+                Ardupilot._process_dict(data["data"]),
+            )._correct_timestamps()
         else:
-            return Ardupilot._from_web_dict(data)
+            return Ardupilot(
+                "web_bin",
+                Ardupilot._process_dict(data),
+            )._correct_timestamps()
 
     @staticmethod
-    def _from_dict(data: dict[str, dict[str, list]]) -> Ardupilot:
-        return Ardupilot(
-            data["filename"],
-            {k: Ardupilot.parse_df(v) for k, v in data["data"].items()},
-        )
-
-    @staticmethod
-    def _from_web_dict(bindata: dict[str, dict[str, list]]) -> Ardupilot:
+    def _process_dict(bindata: dict[str, dict[str, list]]) -> dict[str, pd.DataFrame]:
         # dfs = {k: pd.DataFrame(v) for k,v in bindata.items()}
 
         dfs: dict[str, pd.DataFrame] = {}
@@ -232,24 +238,29 @@ class Ardupilot:
 
         for k, v in groups.items():
             dfs[k] = pd.concat(v)
-            colsort = ["time_boot_s"]
-            for core_col in ["I", "C"]:
-                if core_col in dfs[k].columns:
-                    colsort.append(core_col)
-                    break
-            dfs[k] = dfs[k].sort_values(colsort)
 
         def process_df(df: pd.DataFrame) -> pd.DataFrame:
-            df.insert(0, "TimeUS", np.floor(df.time_boot_s * 1e6).astype(int))  # ms
-            df.insert(0, "timestamp", df.time_boot_s)
+            if "TimeUS" not in df.columns:
+                df.insert(0, "TimeUS", np.floor(df.time_boot_s * 1e6).astype(int))
+            if "timestamp" not in df.columns:
+                df.insert(0, "timestamp", df.TimeUS / 1e6)
 
-            return df.drop(columns="time_boot_s")
+            df = df.drop(columns="time_boot_s", errors="ignore").reset_index(drop=True)
+
+            colsort = ["TimeUS" if "TimeUS" in df.columns else "time_boot_s"]
+            for core_col in ["I", "C"]:
+                if core_col in df.columns:
+                    colsort.append(core_col)
+                    break
+            df = df.sort_values(colsort)
+            return df
 
         dfs = {k: process_df(v) for k, v in dfs.items() if not v.empty}
 
-        return Ardupilot("web_dfs", dfs)._correct_timestamps()
+        return dfs
 
     def _correct_timestamps(self):
+
         if "GPS" in self.dfs:
             gps = self.dfs["GPS"]
 
@@ -269,6 +280,8 @@ class Ardupilot:
             self.filename,
             {
                 k: v.assign(timestamp=v.timestamp + start_time)
+                if v.timestamp[0] < start_time
+                else v
                 for k, v in self.dfs.items()
             },
         )
