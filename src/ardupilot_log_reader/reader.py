@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 class Ardupilot:
     filename: str
     dfs: dict[str, pd.DataFrame]
+    source: Literal["bin_file", "web_compressed", "web_array", "web_legacy"]
 
     def __getattr__(self, name):
         if name in self.dfs:
@@ -152,7 +153,7 @@ class Ardupilot:
                 continue
 
             key = m.get_type()
-            if key=="POS":
+            if key == "POS":
                 pass
             if key not in dfs_dicts:
                 if key == "BAD_DATA":
@@ -168,7 +169,9 @@ class Ardupilot:
                 dfs_dicts[key][field].append(getattr(m, field))
 
         return Ardupilot(
-            mlog.filehandle.name, {k: pd.DataFrame(v) for k, v in dfs_dicts.items()}
+            mlog.filehandle.name,
+            {k: pd.DataFrame(v) for k, v in dfs_dicts.items()},
+            "bin_file",
         )._correct_timestamps()
 
     def parameters(self) -> dict[str, pd.DataFrame]:
@@ -186,6 +189,7 @@ class Ardupilot:
         return {
             "filename": self.filename,
             "data": {k: Ardupilot.write_df(v, **kwargs) for k, v in self.dfs.items()},
+            "source": self.source,
         }
 
     @staticmethod
@@ -208,16 +212,11 @@ class Ardupilot:
 
     @staticmethod
     def from_dict(data: dict[str, dict[str, list]]) -> Ardupilot:
-        if "filename" in data and "data" in data:
-            return Ardupilot(
-                data["filename"],
-                Ardupilot._process_dict(data["data"]),
-            )._correct_timestamps()
-        else:
-            return Ardupilot(
-                "web_bin",
-                Ardupilot._process_dict(data),
-            )._correct_timestamps()
+        return Ardupilot(
+            data.get("filename", "unknown"),
+            Ardupilot._process_dict(data.get("data", data)),
+            source=data.get("source", "web_legacy"),
+        )._correct_timestamps()
 
     @staticmethod
     def _process_dict(bindata: dict[str, dict[str, list]]) -> dict[str, pd.DataFrame]:
@@ -284,6 +283,7 @@ class Ardupilot:
                 else v
                 for k, v in self.dfs.items()
             },
+            self.source
         )
 
     @staticmethod
