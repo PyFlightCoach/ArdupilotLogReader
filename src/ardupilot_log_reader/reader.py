@@ -23,6 +23,12 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+try:
+    import schemas as s
+    HAS_SCHEMAS = True
+except ImportError:
+    HAS_SCHEMAS = False
+
 @dataclass
 class Ardupilot:
     filename: str
@@ -217,6 +223,14 @@ class Ardupilot:
             Ardupilot._process_dict(data.get("data", data)),
             source=data.get("source", "web_legacy"),
         )._correct_timestamps()
+
+    @staticmethod
+    def parse_schema(data) -> Ardupilot:
+        if not HAS_SCHEMAS:
+            raise ImportError("Schemas not available")
+        _d: s.NewBinData | s.LegacyBinData = data
+        
+        return Ardupilot.from_dict(_d.model_dump())
 
     @staticmethod
     def _process_dict(bindata: dict[str, dict[str, list]]) -> dict[str, pd.DataFrame]:
