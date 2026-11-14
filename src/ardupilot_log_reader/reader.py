@@ -123,13 +123,13 @@ class Ardupilot:
             str(bin_file), zero_time_base=zero_time_base
         )
 
-        match_types = Ardupilot.process_patterns(
-            list(mlog.name_to_id.keys()), list(set(types + ["PARM"])), nottypes
-        )
-
-        log = Ardupilot._parse(mlog, match_types, source_system, source_component, link)
-
-        mlog.filehandle.close()
+        try:
+            match_types = Ardupilot.process_patterns(
+                list(mlog.name_to_id.keys()), list(set(types + ["PARM"])), nottypes
+            )
+            log = Ardupilot._parse(mlog, match_types, source_system, source_component, link)
+        finally:
+            mlog.filehandle.close()
 
         if cache_file:
             with open(cache_file, "w") as f:
@@ -207,9 +207,9 @@ class Ardupilot:
         data: pd.Series, mode: Literal["list", "base64", "records"] = "base64"
     ) -> str | list | dict:
         if mode == "records":
-            return data.to_dict(orient="records")
+            return data.to_dict()
         elif mode == "list":
-            return data.to_dict(orient="list")
+            return data.tolist()
         elif mode == "base64":
             if data.dtype == np.float64:
                 return base64.b64encode(data.to_numpy().tobytes()).decode("utf-8")
@@ -280,9 +280,7 @@ class Ardupilot:
             start_time = (
                 Ardupilot._gpsTimeToTime(
                     gps.GWk.iloc[0],
-                    gps.GMS.iloc[0] / 1e3
-                    if gps.GMS.diff().mean() > 10
-                    else gps.GMS.iloc[0],
+                    gps.GMS.iloc[0],
                 )
                 - (gps.TimeUS / 1e6).iloc[0]
             )
