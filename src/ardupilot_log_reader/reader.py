@@ -20,6 +20,14 @@ except ImportError:
     type DFReader_binary = None
     HAS_PYMAVLINK = False
 
+try:
+    import flightlog
+
+    HAS_FLIGHTLOG = True
+except ImportError:
+    flightlog = None
+    HAS_FLIGHTLOG = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,6 +79,7 @@ class Ardupilot:
         link=None,
         mav10=False,
         cache_file: str | Path | bool = False,
+        backend: Literal["auto", "pymavlink", "flightlog"] = "auto",
     ) -> Ardupilot:
         """
         Parses a binary file into an Ardupilot object.
@@ -84,6 +93,10 @@ class Ardupilot:
         source_component (int, optional): The source component ID to filter messages by. Defaults to None (all components in log).
         link (int, optional): The link to filter messages by. Defaults to None.
         mav10 (bool, optional): If True, uses MAVLink 1.0. Defaults to False.
+        backend (str, optional): "pymavlink", "flightlog" or "auto". "auto" uses flightlog when it
+            is installed and no source_system, source_component or link filter is given, and
+            pymavlink otherwise. Both give the same DataFrames; flightlog reads the file in Rust.
+            Defaults to "auto".
 
         Returns:
         Ardupilot: The parsed Ardupilot object.
@@ -112,9 +125,35 @@ class Ardupilot:
                     data = load(f)
                 return Ardupilot.from_dict(data)
 
+        if backend not in ("auto", "pymavlink", "flightlog"):
+            raise ValueError(f"Unknown backend {backend!r}")
+        mavlink_filters = (source_system, source_component, link) != (None, None, None)
+        if backend == "flightlog" or (
+            backend == "auto" and HAS_FLIGHTLOG and not mavlink_filters
+        ):
+            if not HAS_FLIGHTLOG:
+                raise ImportError(
+                    "flightlog is required for backend='flightlog'. Please install it."
+                )
+            if mavlink_filters:
+                raise ValueError(
+                    "source_system, source_component and link need backend='pymavlink'"
+                )
+            log = Ardupilot._parse_flightlog(bin_file, types, nottypes, zero_time_base)
+            if log is not None:
+                if cache_file:
+                    with open(cache_file, "w") as f:
+                        dump(log.to_dict(), f, indent=4)
+                return log
+            if backend == "flightlog" or not HAS_PYMAVLINK:
+                raise ValueError(
+                    f"{bin_file}: a requested message has no TimeUS field; use backend='pymavlink'"
+                )
+
         if not HAS_PYMAVLINK:
             raise ImportError(
-                "pymavlink is required to parse Ardupilot logs. Please install it."
+                "pymavlink is required to parse Ardupilot logs. Please install it"
+                " (or install flightlog)."
             )
         if not mav10:
             os.environ["MAVLINK20"] = "1"
@@ -136,6 +175,47 @@ class Ardupilot:
                 dump(log.to_dict(), f, indent=4)
 
         return log
+
+    @staticmethod
+    def _parse_flightlog(bin_file, types, nottypes, zero_time_base) -> Ardupilot | None:
+        """Read the requested message types with flightlog.
+
+        Gives the same DataFrames as _parse: pymavlink's column order and scaling,
+        int64 and float64 columns, and pymavlink's timestamp (TimeUS plus the time base).
+        Returns None when a requested message has no TimeUS field (very old logs),
+        because pymavlink then works out the timestamps from other clocks.
+        """
+        probe = flightlog.Log(str(bin_file), types=[])
+        if probe.kind != "dataflash":
+            raise ValueError(f"{bin_file} is not a DataFlash log")
+        available = list(probe.counts)
+        match_types = Ardupilot.process_patterns(
+            available, list(set(types + ["PARM"])), nottypes
+        )
+        mlog = flightlog.Log(str(bin_file), types=match_types)
+        base = (
+            0.0
+            if zero_time_base or mlog.utc_offset_us is None
+            else mlog.utc_offset_us * 1e-6
+        )
+        dfs = {}
+        for key in match_types:
+            if key not in mlog:
+                continue
+            df = mlog.table(key).to_pandas()
+            if df.empty:
+                continue
+            if "TimeUS" not in df.columns:
+                return None
+            for col in df.columns:
+                kind = df[col].dtype.kind
+                if kind == "f":
+                    df[col] = df[col].astype(np.float64)
+                elif kind == "i" or (kind == "u" and (df[col] < 2**63).all()):
+                    df[col] = df[col].astype(np.int64)
+            df.insert(0, "timestamp", df["TimeUS"] * 1e-6 + base)
+            dfs[key] = df
+        return Ardupilot(str(bin_file), dfs, "bin_file")._correct_timestamps()
 
     @staticmethod
     def _parse(
