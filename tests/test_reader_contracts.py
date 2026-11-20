@@ -87,6 +87,7 @@ def test_existing_cache_reopens_without_binary_parser_or_optional_dependency(tmp
         "ATT": {"TimeUS": [2_000_000, 1_000_000], "Roll": [2, 1]},
     }}))
     monkeypatch.setattr(reader, "HAS_PYMAVLINK", False)
+    monkeypatch.setattr(reader, "HAS_FLIGHTLOG", False)
     parsed = Ardupilot.parse(tmp_path / "absent.bin", cache_file=cache)
     assert parsed.filename == "cached.bin" and parsed.source == "web_array"
     assert parsed.ATT.Roll.tolist() == [1, 2]
@@ -109,7 +110,7 @@ def test_binary_parser_closes_its_handle_when_message_decoding_raises(tmp_path, 
     monkeypatch.setenv("MAVLINK20", "1")
     try:
         with pytest.raises(ValueError, match="controlled malformed message"):
-            Ardupilot.parse(path, types=["ATT"])
+            Ardupilot.parse(path, types=["ATT"], backend="pymavlink")
         assert handle.closed
     finally:
         handle.close()
