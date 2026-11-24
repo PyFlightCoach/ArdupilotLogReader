@@ -21,3 +21,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = ["pytest>=8.3.3"]
 lint = ["ruff>=0.7.3"]
+
+[tool.hatch.build.targets.sdist]
+# The test logs and the pymavlink field dump are well over PyPI's 100 MB file limit.
+exclude = ["tests/test_inputs", "pymavlink_bin_fields.json"]
