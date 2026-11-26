@@ -1,6 +1,6 @@
 [project]
 name = "ardupilot_log_reader"
-version = "0.4.0"
+version = "0.4.1"
 description = "module to read ardupilot binary logs to memory"
 readme = "README.md"
 authors = [{ name = "Thomas David", email = "thomasdavid0@gmail.com" }]
